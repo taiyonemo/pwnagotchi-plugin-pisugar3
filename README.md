@@ -25,4 +25,11 @@ main.plugins.pisugar3.shutdown = 5
 - [ ] Display battery voltage from 0x22 and 0x23
 - [ ] Display charging status. 6th bit from 0x02
 - [ ] Safe shutdown using soft switch or powerswitch.
+- [ ] Pisugar RTC??
+
+# Referaces
+https://github.com/evilsocket/pwnagotchi/blob/master/pwnagotchi/plugins/default/ups_lite.py
+https://github.com/kellertk/pwnagotchi-plugin-pisugar2/blob/main/pisugar2.py
+https://github.com/PiSugar/PiSugar/wiki/PiSugar-3-Series#%EF%B8%8F-full-functions-ups
+https://www.tindie.com/stores/pisugar/
 

@@ -34,7 +34,7 @@ class UPS:
         except:
             return battery_level
 
-class PiSugar2(plugins.Plugin):
+class PiSugar3(plugins.Plugin):
     __author__ = 'taiyonemo@protonmail.com'
     __version__ = '1.0.0'
     __license__ = 'GPL3'

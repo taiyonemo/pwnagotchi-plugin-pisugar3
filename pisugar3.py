@@ -2,6 +2,7 @@
 
 import logging
 import struct
+import time
 
 from pwnagotchi.ui.components import LabeledValue
 from pwnagotchi.ui.view import BLACK
@@ -19,7 +20,7 @@ class UPS:
     def voltage(self):
         try:
             low = self._bus.read_byte_data(0x57, 0x23)
-            high = self._bus.read_byte_date(0x57, 0x22)
+            high = self._bus.read_byte_data(0x57, 0x22)
             v = (((high << 8) + low)/1000)
             return v
         except:
@@ -34,6 +35,12 @@ class UPS:
         except:
             return battery_level
 
+    def status(self):
+        stat02 = self._bus.read_byte_data(0x57, 0x02)
+        stat03 = self._bus.read_byte_data(0x57, 0x03)
+        stat04 = self._bus.read_byte_data(0x57, 0x04)
+        return stat02, stat03, stat04
+
 class PiSugar3(plugins.Plugin):
     __author__ = 'taiyonemo@protonmail.com'
     __version__ = '1.0.0'
@@ -42,22 +49,54 @@ class PiSugar3(plugins.Plugin):
 
     def __init__(self):
         self.ups = None
+        self.lasttemp = 69
+        self.drot = 0 # display rotation
+        self.nextDChg = 0 # last time display changed, rotate on updates after 5 seconds
 
     def on_loaded(self):
         self.ups = UPS()
         logging.info("[pisugar3] plugin loaded.")
 
     def on_ui_setup(self, ui):
-        ui.add_element('bat', LabeledValue(color=BLACK, label='BAT', value='0%/0V', position=(ui.width() / 2 + 15, 0),
-                                           label_font=fonts.Bold, text_font=fonts.Medium))
+        try:
+            ui.add_element('bat', LabeledValue(color=BLACK, label='BAT', value='0%', position=(ui.width() / 2 + 10, 0),
+                                               label_font=fonts.Bold, text_font=fonts.Medium))
+        except Exception as err:
+            logging.warning("pisugar3 setup err: %s" % repr(err))
 
     def on_unload(self, ui):
-        with ui._lock:
-            ui.remove_element('bat')
+        try:
+            with ui._lock:
+                ui.remove_element('bat')
+        except Exception as err:
+            logging.warning("pisugar3 unload err: %s" % repr(err))
 
     def on_ui_update(self, ui):
         capacity = self.ups.capacity()
-        ui.set('bat', "%2i%%" % capacity)
+        voltage = self.ups.voltage()
+        stats = self.ups.status()
+        temp = stats[2] - 40
+        if temp != self.lasttemp:
+            logging.debug("pisugar3 (chg %X, info %X, temp %d)" % (stats[0], stats[1], temp))
+            self.lasttemp = temp
+
+        if stats[0] & 0x80: # charging, or has power connected
+            ui._state._state['bat'].label = "CHG"
+        else:
+            ui._state._state['bat'].label = "BAT"
+
+            
+        if time.time() > self.nextDChg:
+            self.drot = (self.drot + 1) % 3
+            self.nextDChg = time.time() + 5
+
+        if self.drot == 0:  # show battery voltage
+            ui.set('bat', "%2.2fv" % (voltage))
+        elif self.drot == 1:
+            ui.set('bat', "%2i%%" % (capacity))
+        else:
+            ui.set('bat', "%2i\xb0" % (temp));
+                
         if capacity <= self.options['shutdown']:
             logging.info('[pisugar3] Empty battery (<= %s%%): shuting down' % self.options['shutdown'])
             ui.update(force=True, new_data={'status': 'Battery exhausted, bye ...'})
